@@ -15,32 +15,89 @@ contract Crowdsourcing {
     mapping(address => uint) requesterCollaterals;
     // 对于一个任务，剩下的Workers数量
     mapping(address => uint) remainingWorkers;
+    // 对于每个任务所需要的押金
+    mapping(address => uint) taskCollaterals;
     // 负责在特定条件下用来进行交互的Event，进行交易的触发
     // 假若Requester完成了任务并进行了评估，那么它就会触发一个交易来
     // 奖励Workers，同时Workers也可以通过监听该信息来判断其
     // 是否收到了相应的奖励
     event Tranfer(address indexed _from, address indexed _to, uint _val);
-    event TaskPublished(address indexed _task, string indexed description);
-    constructor {
+    event TaskPublished(address indexed _task, string description);
+    event MSGSender(address indexed);
+    /**
+     * 为了保证该Smart Contract能够接受来自其他用户的押金
+     * 需要实现Fallback Function. 
+     * Requester需要将押金从传递到智能合约的地址
+     * 后期为了进行权限控制，需要判断消息发送者是否真的为Requesters
+     * Workers需要将押金从传递到智能合约的地址 
+     * 后期为了进行权限控制，需要判断消息发送者是否真的为Workers
+     */
+    function() external payable {
+        // string memory data = abi.decode(msg.data, (string));
+        string memory data = "requester";
+        string memory requester = "requester";
+        string memory worker = "worker";
+        require(keccak256(abi.encodePacked(data)) == keccak256(abi.encodePacked(requester)) || 
+            keccak256(abi.encodePacked(data)) == keccak256(abi.encodePacked(worker)), 
+            "Not supported data");
+        if (keccak256(abi.encodePacked(data)) == keccak256(abi.encodePacked(requester))) {
+            requesterCollaterals[msg.sender] += msg.value;
+        }
+        else {
+            workerCollaterals[msg.sender] += msg.value;
+        }
+        emit MSGSender(msg.sender);
     }
-
-    function MakeCrowdsourcingTasks(address payable requester, uint collater, uint workers_needed, string description) {
+    // 
+    // 创建一个新的众包任务，同时该函数会发出一个新的Event表示任务已经创建成功
+    // Workers可以通过订阅这个Event来接收到最新的Tasks的信息，从而自己决定要不要
+    // 参加该众包任务
+    function PublishCrowdsourcingTask(address payable requester, uint collater, uint workers_needed, string memory description) public {
         // 对任务的信息进行记录，包括保存任务的押金，记录任务需要的人数
+        require (requesterCollaterals[requester] >= collater, "Not enough amount to pay the collaterals");
         uint exceptedRewards = collater / workers_needed;
-        description += addString("Rewards: ", uintToString(exceptedRewards));
-        requesterCollaterals[requester] = collater;
+        description = addString(description, addString("\nRewards: ", uintToString(exceptedRewards)));
+        // 假若Requester已经提交了押金，那么其在智能合约里面存储的剩余
+        // 押金应该是大于或等于collater的
+        taskCollaterals[requester] = exceptedRewards;
         remainingWorkers[requester] = workers_needed;
-        TaskPublished(_task, description);
+        emit TaskPublished(requester, description);
     }
+    // 给定一个地址，查看其所需要的Workers数量是否已满
+    function RemainingWorkers(address task) public view returns (uint rem) {
+        rem = remainingWorkers[task];
+    }
+    /** 
+    * Workers参与任务
+    * 用户想要参加某一个众包任务，它需要缴纳一定的押金，一部分是作为激励
+    * 同时也是为了防止用户进行女巫攻击
+    **/
+    function JoinCrowdsourcingTask(address payable worker, address payable task) public {
+        uint remWorkers = remainingWorkers[task];
+        require (remWorkers > 0, "The task no longer needs more worker");
+        require (workerCollaterals[task] >= taskCollaterals[task], "Not enough amount to pay the collaterals");
+        // 此时任务算是被workers接受了
+        remainingWorkers[worker]--;
+    }
+    /**
+    * 进行任务奖励
+    * 按照我们设计的协议，任务应该是由Workers直接提交到Requesters的，
+    * 但是目前在这里作为测试用例，在智能合约上面实现该操作
+    */
+    // function Rewarding(address payable worker, address payable requester, bool isSatisfy) public {
+    //     require(requester == msg.sender, "Only requester can trigger this message");
+    //     if (isSatisfy) {
+    //     }
+    // }
     // 辅助函数，用来进行从uint到string的转化，这一步主要是帮助Contracs进行任务的转化
-    function uintToString(uint v) constant returns (string str) {
+    function uintToString(uint v) internal pure returns (string memory str) {
         uint maxlength = 100;
         bytes memory reversed = new bytes(maxlength);
         uint i = 0;
         while (v != 0) {
             uint remainder = v % 10;
             v = v / 10;
-            reversed[i++] = byte(48 + remainder);
+            reversed[i++] = byte(uint8(48 + remainder));
         }
         bytes memory s = new bytes(i);
         for (uint j = 0; j < i; j++) {
@@ -48,7 +105,17 @@ contract Crowdsourcing {
         }
         str = string(s);
     }
-    function addString(string a, string b) internal pure returns (string) {
+    function addString(string memory a, string memory b) internal pure returns (string memory) {
         return string(abi.encodePacked(a, b));
+    }
+    // 将字符串转化为固定长度的Bytes32，这样客户端可以很方便的将Event重新转化为字符串再进行描述
+    function stringToBytes32(string memory source) internal pure returns (bytes32 result) {
+        bytes memory tempEmptyStringTest = bytes(source);
+        if (tempEmptyStringTest.length == 0) {
+            return 0x0;
+        }
+        assembly {
+            result := mload(add(source, 32))
+        }
     }
 }

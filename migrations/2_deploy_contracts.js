@@ -1,5 +1,5 @@
-var CrowdSourcing = artifacts.require("CrowdSourcing")
+var Crowdsourcing = artifacts.require("Crowdsourcing")
 
 module.exports = function(deployer) {
-    deployer.deploy(CrowdSourcing);
+    deployer.deploy(Crowdsourcing);
 }
