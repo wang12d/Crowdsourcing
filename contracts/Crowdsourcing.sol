@@ -100,6 +100,7 @@ contract Crowdsourcing {
         }
         else {
             worker.transfer(workerAwards[worker]);
+            msg.sender.transfer(taskCollaterals[msg.sender]);
         }
         // 奖励已经发出，现在清除其状态
         workersOfTask[msg.sender][worker] = false;

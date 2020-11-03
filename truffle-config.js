@@ -72,6 +72,14 @@ module.exports = {
     // network_id: 2111,   // This network is yours, in the cloud.
     // production: true    // Treats this network as if it was a public net. (default: false)
     // }
+    //ganachecli: {
+    //    host: "127.0.0.1",
+    //    port: 8545,
+    //    network_id: "*",
+    //    defaultEtherBalance: 10,
+    //    accounts: 5,
+    //    blockTime: 3
+    //}
   },
 
   // Set default mocha options here, use special reporters etc.
