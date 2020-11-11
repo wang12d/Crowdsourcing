@@ -21,13 +21,16 @@ contract Crowdsourcing {
     mapping(address => uint) workerAwards;
     // 确保每个任务都有其对应的workers，在进行奖励分发的时候使用
     mapping(address => mapping(address => bool)) workersOfTask;
+    // 每个worker是否进行了数据上传
+    mapping(address => mapping(address => bool)) dataSubmitted;
     // 
     // 负责在特定条件下用来进行交互的Event，进行交易的触发
     // 假若Requester完成了任务并进行了评估，那么它就会触发一个交易来
     // 奖励Workers，同时Workers也可以通过监听该信息来判断其
     // 是否收到了相应的奖励
-    event Tranfer(address indexed _from, address indexed _to, uint _val);
     event TaskPublished(address indexed _task, string description);
+    event Tranfer(address indexed _from, address indexed _to, uint _val);
+    event DataSubmitted(address indexed _from, bytes data);
     /**
      * 为了保证该Smart Contract能够接受来自其他用户的押金
      * 需要实现Fallback Function. 
@@ -41,7 +44,7 @@ contract Crowdsourcing {
         bytes memory worker = hex"00";
         require(keccak256(abi.encodePacked(msg.data)) == keccak256(abi.encodePacked(requester)) || 
             keccak256(abi.encodePacked(msg.data)) == keccak256(abi.encodePacked(worker)), 
-            "Not supported data");
+            "You should either be worker or requester");
         if (keccak256(abi.encodePacked(msg.data)) == keccak256(abi.encodePacked(requester))) {
             requesterCollaterals[msg.sender] += msg.value;
         }
@@ -86,6 +89,20 @@ contract Crowdsourcing {
         workerCollaterals[worker] -= taskCollaterals[task];
         // 此时任务算是被workers接受了
         remainingWorkers[task]--;
+    }
+    /**
+    * Workers进行任务上传
+    * 它应该上传的是一个加密的数据包，或者当数据直接在区块链上面
+    * 进行传递时不划算了，那么则应该上传相应对应数据块的索引，这样
+    * 相应Requester就能够找到并对其进行访问
+    */
+    function SubmitData(address payable task, bytes data) {
+        // For each requester, the worker can only upload
+        // the encrypted data it collects at most once to avoid
+        // a user uses the same address to upload multiple data
+        require(workersOfTask[task][msg.sender] == false, "You already submitted your data");
+        workersOfTask[task][msg.sender] = true;
+        emit DataSubmitted(task, data); // Requester by subscription to track the process of the current task
     }
     /**
     * 进行任务奖励
