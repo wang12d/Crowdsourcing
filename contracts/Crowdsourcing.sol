@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.8.0;
 
+import "/.node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 // @title 移动众包-智能合约
 // 主要负责处理Workers和Requesters之间的关系，它需要
 // 进行：
