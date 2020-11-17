@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.22 <0.8.0;
 
-import "./node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // @title 移动众包-智能合约
 // 主要负责处理Workers和Requesters之间的关系，它需要
 // 进行：
 //      1. 负责审核Workers参与任务的请求
 //      2. 当Requesters创建任务时，保存Requesters所需要的押金
-contract Crowdsourcing {
+contract Crowdsourcing is ERC20 {
     // 负责保存Workers所提交的押金，每一个地址都保存一定数量的押金
     mapping(address => uint) workerCollaterals;
     // 负责保存Requesters所提交的押金，每一个地址都对应一个Requesters,
@@ -41,7 +41,10 @@ contract Crowdsourcing {
      * Workers需要将押金从传递到智能合约的地址 
      * 后期为了进行权限控制，需要判断消息发送者是否真的为Workers
      */
-    function() external payable {
+    constructor() public ERC20("TaskSubmissionTicket", "TST") {
+    }
+    // Change to receive according to Solidity v0.6.0 specification https://docs.soliditylang.org/en/v0.6.0/contracts.html#receive-ether-function.
+    receive() external payable {
         bytes memory requester = hex"01";
         bytes memory worker = hex"00";
         require(keccak256(abi.encodePacked(msg.data)) == keccak256(abi.encodePacked(requester)) || 
@@ -98,7 +101,7 @@ contract Crowdsourcing {
     * 进行传递时不划算了，那么则应该上传相应对应数据块的索引，这样
     * 相应Requester就能够找到并对其进行访问
     */
-    function SubmitData(address payable task, bytes data) {
+    function SubmitData(address payable task, bytes memory data) public {
         // For each requester, the worker can only upload
         // the encrypted data it collects at most once to avoid
         // a user uses the same address to upload multiple data
