@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.22 <0.8.0;
+pragma solidity >=0.6.0 <0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 
 // @title 移动众包-智能合约
 // 主要负责处理Workers和Requesters之间的关系，它需要
 // 进行：
 //      1. 负责审核Workers参与任务的请求
 //      2. 当Requesters创建任务时，保存Requesters所需要的押金
-contract Crowdsourcing is ERC20 {
+contract Crowdsourcing is ERC20Burnable {
     // 负责保存Workers所提交的押金，每一个地址都保存一定数量的押金
     mapping(address => uint) workerCollaterals;
     // 负责保存Requesters所提交的押金，每一个地址都对应一个Requesters,
@@ -42,6 +42,7 @@ contract Crowdsourcing is ERC20 {
      * 后期为了进行权限控制，需要判断消息发送者是否真的为Workers
      */
     constructor() public ERC20("TaskSubmissionTicket", "TST") {
+        _setupDecimals(0);  // 因为我们只需要token来充当凭证，而不是真的数值
     }
     // 根据Solidity 0.6.2的描述进行修改 https://docs.soliditylang.org/en/v0.6.0/contracts.html#receive-ether-function.
     fallback() external payable {
@@ -61,8 +62,9 @@ contract Crowdsourcing is ERC20 {
     // 创建一个新的众包任务，同时该函数会发出一个新的Event表示任务已经创建成功
     // Workers可以通过订阅这个Event来接收到最新的Tasks的信息，从而自己决定要不要
     // 参加该众包任务
-    function PublishCrowdsourcingTask(address payable requester, uint collater, uint workers_needed, string memory description) public {
+    function PublishCrowdsourcingTask(uint collater, uint workers_needed, string memory description) public {
         // 对任务的信息进行记录，包括保存任务的押金，记录任务需要的人数
+        address requester = msg.sender;
         require (requesterCollaterals[requester] >= collater, "Not enough amount to pay the collaterals");
         uint exceptedRewards = collater / workers_needed;
         description = addString(description, addString("\nRewards: ", uintToString(exceptedRewards)));
@@ -74,6 +76,9 @@ contract Crowdsourcing is ERC20 {
         // 将其内容全部清零
         taskCollaterals[requester] = exceptedRewards;
         remainingWorkers[requester] = workers_needed;
+        // 在requester使用自己的伪名进行任务发布以后，requester能够获得token的分发
+        // 并且在workers完成任务的时候才能够获得token作为奖励
+        _mint(requester, workers_needed);   // 在有必要的时候可以将token销毁
         emit TaskPublished(requester, description);
     }
     // 给定一个地址，查看其所需要的Workers数量是否已满
@@ -85,7 +90,8 @@ contract Crowdsourcing is ERC20 {
     * 用户想要参加某一个众包任务，它需要缴纳一定的押金，一部分是作为激励
     * 同时也是为了防止用户进行女巫攻击
     **/
-    function JoinCrowdsourcingTask(address payable worker, address payable task) public {
+    function JoinCrowdsourcingTask(address payable task) public {
+        address worker = msg.sender;
         uint remWorkers = remainingWorkers[task];
         require (remWorkers > 0, "The task no longer needs more worker");
         require (workerCollaterals[worker] >= taskCollaterals[task], "Not enough amount to pay the collaterals");
@@ -116,13 +122,19 @@ contract Crowdsourcing is ERC20 {
     */
     function Rewarding(address payable worker, bool isok) public {
         // 只有Requester才能调用此信息
-        require(workersOfTask[msg.sender][worker] == true, "Only requester can call this to workers who participants its task");
+        require(workersOfTask[msg.sender][worker] == true, "Only requester can call this to workers who participants its task and has not been rewarded.");
         if (isok) {
             worker.transfer(workerAwards[worker]+taskCollaterals[msg.sender]);
+            // 如果该worker任务完成很好，那么则授予一个token给他进行奖励
+            // 于是它下次也可以参与任务
+            transfer(worker, 1);
         }
         else {
-            worker.transfer(workerAwards[worker]);
-            msg.sender.transfer(taskCollaterals[msg.sender]);
+            worker.transfer(workerAwards[worker]);  // 退还押金
+            msg.sender.transfer(taskCollaterals[msg.sender]); // 退还押金
+            // 该worker并没有诚实的参与任务，需要销毁一个token
+            burn(1);
+            
         }
         // 奖励已经发出，现在清除其状态
         workersOfTask[msg.sender][worker] = false;
