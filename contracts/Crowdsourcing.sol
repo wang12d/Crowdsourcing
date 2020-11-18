@@ -43,8 +43,8 @@ contract Crowdsourcing is ERC20 {
      */
     constructor() public ERC20("TaskSubmissionTicket", "TST") {
     }
-    // Change to receive according to Solidity v0.6.0 specification https://docs.soliditylang.org/en/v0.6.0/contracts.html#receive-ether-function.
-    receive() external payable {
+    // 根据Solidity 0.6.2的描述进行修改 https://docs.soliditylang.org/en/v0.6.0/contracts.html#receive-ether-function.
+    fallback() external payable {
         bytes memory requester = hex"01";
         bytes memory worker = hex"00";
         require(keccak256(abi.encodePacked(msg.data)) == keccak256(abi.encodePacked(requester)) || 

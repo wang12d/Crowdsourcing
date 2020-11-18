@@ -1,4 +1,4 @@
-//require("./web3")
+require("./web3")
 const contracts = require("./setup")
 const events = require("./events")
 const Crowdsourcing = artifacts.require("Crowdsourcing");
