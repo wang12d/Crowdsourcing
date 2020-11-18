@@ -4,4 +4,4 @@ A private-preserving crowdsourcing based on blockchain
 
 # TODO
 
-- [ ] 使用ERC20标准完成对伪名身份的认证
+- [x] According to the task completion, requester should reward a worker ERC20 token or just burn it.
