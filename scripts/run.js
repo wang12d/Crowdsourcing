@@ -1,6 +1,7 @@
 require("./web3")
 const contracts = require("./setup")
 const events = require("./events")
+const libmcs = require("./libmcs")
 const Crowdsourcing = artifacts.require("Crowdsourcing");
 
 const action = async () => {
